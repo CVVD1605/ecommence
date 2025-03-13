@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Shopping Cart{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>🛒 Shopping Cart</h1>
+
+    {% if cart_items %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cart_items %}
+                <tr>
+                    <td>{{ item.product.description }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>${{ item.price }}</td>
+                    <td>${{ item.line_total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h3>Total: ${{ cart.total }}</h3>
+
+        <!-- ✅ Checkout Button -->
+        <form method="post" action="{% url 'checkout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">Complete Purchase</button>
+        </form>
+
+    {% else %}
+        <p class="alert alert-warning">⚠️ Your cart is empty.</p>
+    {% endif %}
+
+    <!-- ✅ Debugging Section -->
+    <h2>🛠️ Debugging Info</h2>
+    <ul>
+        <li><strong>Cart ID:</strong> {{ cart.id }}</li>
+        <li><strong>Items in Cart:</strong> {{ cart_items|length }}</li>
+    </ul>
+
+    <!-- ✅ AI-Powered Recommended Products Section -->
+    {% if recommended_products %}
+        <h3>✨ Recommended Products</h3>
+        <div class="row">
+            {% for product in recommended_products %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ product.name }}</h5>
+                            <p class="card-text">{{ product.description }}</p>
+                            <p><strong>Price:</strong> ${{ product.price }}</p>
+                            <button class="btn btn-primary" onclick="addToCart('{{ product.id }}')">Add to Cart</button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<!-- ✅ JavaScript to Handle "Add to Cart" -->
+<script>
+    function addToCart(productId) {
+        fetch(`/cart/add/${productId}/`, {  
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+            },
+            body: JSON.stringify({ product_id: productId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Product added to cart!');
+                location.reload();  // ✅ Refresh cart after adding item
+            } else if (data.error) {
+                alert('⚠️ ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error adding to cart:', error);
+            alert('❌ An error occurred. Please try again.');
+        });
+    }
+</script>
+
+{% endblock %}
