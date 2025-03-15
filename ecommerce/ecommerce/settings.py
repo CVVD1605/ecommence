@@ -12,6 +12,16 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+print(f"✅ Loaded OpenAI Key: {OPENAI_API_KEY}")
+print(f"✅ Loaded Gemini Key: {GEMINI_API_KEY}")
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,6 +31,7 @@ LOGIN_REDIRECT_URL = '/'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-p0pu=ri#$=oxxn8--et9j38g*r*(*^^ia!hy@p$960o4h=w$cr'
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True

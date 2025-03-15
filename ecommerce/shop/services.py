@@ -1,5 +1,19 @@
-from .models import Product, PurchaseHeader, PurchaseDetail, Customer  # ✅ Ensure all models are imported
+from .models import Product, PurchaseHeader, PurchaseDetail, Customer  
+from django.conf import settings
+import openai
 
+openai.api_key = settings.OPENAI_API_KEY 
+
+def chat_with_gpt(user_input):
+    """Send user input to OpenAI API and return AI response."""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # Change to "gpt-3.5-turbo" if needed
+            messages=[{"role": "user", "content": user_input}]
+        )
+        return response["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"⚠️ AI Error: {str(e)}"
 def recommend_products_for_user(user):
     """Recommends products based on user purchase history."""
     try:
