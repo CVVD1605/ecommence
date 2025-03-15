@@ -24,6 +24,8 @@ urlpatterns = [
 
     # 🔹 AI-Generated Product Descriptions
     path('generate-description/', views.generate_description, name='generate_description'),
+    path('chatbot/', views.chatbot_response, name='chatbot'),
+
 
     # 🔹 Purchase History
     path('purchase-history/', views.purchase_history, name='purchase_history'),
