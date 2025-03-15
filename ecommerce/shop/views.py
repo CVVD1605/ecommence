@@ -119,7 +119,11 @@ def generate_description(request):
         if not prompt:
             return JsonResponse({"error": "Prompt is required."}, status=400)
         
-        return JsonResponse({"description": generate_product_description(prompt)})
+        # Generate the description (replace with your own logic)
+        generator = pipeline('text-generation', model='gpt2')
+        result = generator(prompt, max_length=50, num_return_sequences=1)
+        generated_description = result[0]['generated_text']
+        return JsonResponse({"description": generated_description})
     
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
@@ -128,6 +132,8 @@ def create_product(request):
     form = ProductForm(request.POST or None)
     if form.is_valid():
         product = form.save(commit=False)
+        prompt_value = form.cleaned_data.get('prompt')
+        product.description = generate_product_description(prompt_value)
         product.save()
         return redirect('product_list')
     return render(request, 'product_form.html', {'form': form})
@@ -186,34 +192,72 @@ def purchase_details(request, purchase_id):
     return render(request, 'purchase_details.html', context)
 
 # ----------------- 🔹 CART FUNCTIONALITY 🔹 -----------------
+# @login_required
+# def cart_detail(request):
+#     """View to display cart details."""
+#     try:
+#         cart_customer, created = Customer.objects.get_or_create(user=request.user, defaults={'email': request.user.email})
+
+#         # ✅ Ensure the cart exists before accessing related fields
+#         cart, created = Cart.objects.get_or_create(customer=cart_customer, defaults={'total': 0})
+
+#         if created:
+#             cart.save()  # ✅ Ensure the cart is saved before querying items
+
+#         cart_items = CartItem.objects.filter(cart=cart)  # ✅ Make sure cart items exist
+
+#         # ✅ AI Recommendations
+#         # recommended_products = recommend_products_for_user(request.user)
+        
+#         print(f"🛒 Cart for {cart_customer}: {cart}")  # ✅ Debugging Print
+#         print(f"📦 Items in Cart: {cart_items.count()}")  # ✅ Debugging Print
+
+#         return render(request, 'cart_detail.html', {
+#             'cart': cart,
+#             'cart_items': cart_items
+#             # 'recommended_products': recommended_products 
+#         })
+
+#     except Customer.DoesNotExist:
+#         messages.error(request, "No customer profile found. Please complete your profile.")
+#         return redirect('profile')
+
+#     except Exception as e:
+#         messages.error(request, f"An error occurred: {str(e)}")
+#         return redirect('product_list')
+
 @login_required
 def cart_detail(request):
-    """View to display cart details."""
+    """View to display cart details and AI recommendations."""
     try:
+        # ✅ Ensure customer exists
         cart_customer, created = Customer.objects.get_or_create(user=request.user, defaults={'email': request.user.email})
-
-        # ✅ Ensure the cart exists before accessing related fields
+        
+        # ✅ Ensure cart exists
         cart, created = Cart.objects.get_or_create(customer=cart_customer, defaults={'total': 0})
 
         if created:
-            cart.save()  # ✅ Ensure the cart is saved before querying items
+            cart.save()
 
-        cart_items = CartItem.objects.filter(cart=cart)  # ✅ Make sure cart items exist
-        
-        print(f"🛒 Cart for {cart_customer}: {cart}")  # ✅ Debugging Print
-        print(f"📦 Items in Cart: {cart_items.count()}")  # ✅ Debugging Print
+        cart_items = cart.items.all()
+
+        # ✅ AI-Powered Recommendations
+        recommended_products = recommend_products_for_user(request.user)
 
         return render(request, 'cart_detail.html', {
             'cart': cart,
-            'cart_items': cart_items
+            'cart_items': cart_items,
+            'recommended_products': recommended_products  # ✅ Pass recommendations to template
         })
 
     except Customer.DoesNotExist:
-        messages.error(request, "No customer profile found. Please complete your profile.")
-        return redirect('profile')
+        messages.error(request, "⚠️ No customer profile found. Please register first.")
+        print("❌ Error: No customer profile found for user:", request.user.username)  # ✅ Debug print
+        return redirect('register')
 
     except Exception as e:
-        messages.error(request, f"An error occurred: {str(e)}")
+        messages.error(request, f"⚠️ An error occurred: {str(e)}")
+        print(f"❌ Error in cart_detail(): {str(e)}")  # ✅ Debug print
         return redirect('product_list')
 
 
@@ -333,29 +377,45 @@ def add_to_cart(request, product_id):  # ✅ Ensure function is defined
 
 # ----------------- 🔹 FEEDBACK & SENTIMENT ANALYSIS 🔹 -----------------
 
-def analyze_sentiment(text):
-    """Analyze sentiment of a given text."""
-    scores = sia.polarity_scores(text)
-    return ("Positive" if scores['compound'] > 0.05 else
-            "Negative" if scores['compound'] < -0.05 else "Neutral"), scores['compound']
+def analyze_sentiment(self):
+    sia = SentimentIntensityAnalyzer()
+    sentiment_scores = sia.polarity_scores(self.comments)
+    self.sentiment_score = sentiment_scores['compound']
+    if sentiment_scores['compound'] > 0.05:
+        self.sentiment = "Positive"
+    elif sentiment_scores['compound'] < -0.05:
+        self.sentiment = "Negative"
+    else:
+        self.sentiment = "Neutral"
 
 @login_required
 def submit_feedback(request, product_id):
-    """Submit feedback and analyze sentiment."""
+    """View to submit feedback for a product."""
     product = get_object_or_404(Product, id=product_id)
 
     if request.method == 'POST':
         form = FeedbackForm(request.POST)
         if form.is_valid():
             feedback = form.save(commit=False)
-            feedback.customer = get_object_or_404(Customer, user=request.user)
-            feedback.product = product
-            feedback.sentiment, feedback.sentiment_score = analyze_sentiment(feedback.comments)
-            feedback.save()
-            messages.success(request, "Thank you for your feedback!")
-            return redirect('product_list')
 
-    return render(request, 'submit_feedback.html', {'form': FeedbackForm(), 'product': product})
+            # Ensure the correct customer is retrieved
+            try:
+                customer = Customer.objects.get(user=request.user) 
+                feedback.customer = customer
+                feedback.product = product
+                analyze_sentiment(feedback)  # ✅ Ensure this function exists
+                feedback.save()
+                messages.success(request, "Thank you for your feedback!")
+                return redirect('product_list')
+
+            except Customer.DoesNotExist:
+                messages.error(request, "⚠️ No customer profile found. Please register first.")
+                return redirect('register')
+
+    else:
+        form = FeedbackForm()
+
+    return render(request, 'submit_feedback.html', {'form': form, 'product': product})
 
 @login_required
 def view_feedback(request, product_id):

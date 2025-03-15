@@ -30,44 +30,35 @@
 
         <h3>Total: ${{ cart.total }}</h3>
 
-        <!-- ✅ Checkout Button -->
         <form method="post" action="{% url 'checkout' %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-success">Complete Purchase</button>
         </form>
-
     {% else %}
         <p class="alert alert-warning">⚠️ Your cart is empty.</p>
     {% endif %}
 
-    <!-- ✅ Debugging Section -->
-    <h2>🛠️ Debugging Info</h2>
-    <ul>
-        <li><strong>Cart ID:</strong> {{ cart.id }}</li>
-        <li><strong>Items in Cart:</strong> {{ cart_items|length }}</li>
-    </ul>
-
     <!-- ✅ AI-Powered Recommended Products Section -->
     {% if recommended_products %}
-        <h3>✨ Recommended Products</h3>
-        <div class="row">
-            {% for product in recommended_products %}
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ product.name }}</h5>
-                            <p class="card-text">{{ product.description }}</p>
-                            <p><strong>Price:</strong> ${{ product.price }}</p>
-                            <button class="btn btn-primary" onclick="addToCart('{{ product.id }}')">Add to Cart</button>
-                        </div>
+    <h3>✨ Recommended for You</h3>
+    <div class="row">
+        {% for product in recommended_products %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ product.code }}</h5>  <!-- ✅ Fix: Use 'code' instead of 'name' -->
+                        <p class="card-text">{{ product.description }}</p>
+                        <p><strong>Price:</strong> ${{ product.price }}</p>
+                        <button class="btn btn-primary" onclick="addToCart('{{ product.id }}')">Add to Cart</button>
                     </div>
                 </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
 </div>
 
-<!-- ✅ JavaScript to Handle "Add to Cart" -->
 <script>
     function addToCart(productId) {
         fetch(`/cart/add/${productId}/`, {  
@@ -82,7 +73,7 @@
         .then(data => {
             if (data.success) {
                 alert('✅ Product added to cart!');
-                location.reload();  // ✅ Refresh cart after adding item
+                location.reload();
             } else if (data.error) {
                 alert('⚠️ ' + data.error);
             }

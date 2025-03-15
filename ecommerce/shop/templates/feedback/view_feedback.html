@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Product Feedback{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Feedback for {{ product.name }}</h1>
+
+    {% if feedback_list %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>Comments</th>
+                    <th>Sentiment</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for feedback in feedback_list %}
+                <tr>
+                    <td>{{ feedback.customer.user.username }}</td>
+                    <td>{{ feedback.comments }}</td>
+                    <td>
+                        {% if feedback.sentiment == "Positive" %}
+                            <span class="text-success">😊 {{ feedback.sentiment }}</span>
+                        {% elif feedback.sentiment == "Negative" %}
+                            <span class="text-danger">😡 {{ feedback.sentiment }}</span>
+                        {% else %}
+                            <span class="text-warning">😐 {{ feedback.sentiment }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ feedback.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="alert alert-warning">⚠️ No feedback available for this product.</p>
+    {% endif %}
+
+    <a href="{% url 'product_list' %}" class="btn btn-primary">Back to Products</a>
+</div>
+{% endblock %}
