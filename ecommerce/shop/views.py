@@ -113,29 +113,51 @@ def generate_product_description(name):
     result = description_generator(prompt, max_length=50, num_return_sequences=1)
     return result[0]['generated_text']
 
+@csrf_exempt # Disable CSRF protection for this view)
 def generate_description(request):
+    """AI-powered product description generator."""
     if request.method == "POST":
-        prompt = request.POST.get('prompt', '')
-        if not prompt:
-            return JsonResponse({"error": "Prompt is required."}, status=400)
-        
-        # Generate the description (replace with your own logic)
-        generator = pipeline('text-generation', model='gpt2')
-        result = generator(prompt, max_length=50, num_return_sequences=1)
-        generated_description = result[0]['generated_text']
-        return JsonResponse({"description": generated_description})
-    
+        try:
+            # ✅ Handle both JSON and form-data requests
+            if request.content_type == "application/json":
+                data = json.loads(request.body)
+                prompt = data.get('prompt', '')
+            else:
+                prompt = request.POST.get('prompt', '')
+
+            if not prompt:
+                return JsonResponse({"error": "Prompt is required."}, status=400)
+
+            # ✅ Use Hugging Face GPT-2 model to generate text
+            generator = pipeline('text-generation', model='gpt2')
+            result = generator(prompt, max_length=50, num_return_sequences=1)
+            generated_description = result[0]['generated_text']
+
+            return JsonResponse({"description": generated_description})
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
 @login_required
 def create_product(request):
-    form = ProductForm(request.POST or None)
-    if form.is_valid():
-        product = form.save(commit=False)
-        prompt_value = form.cleaned_data.get('prompt')
-        product.description = generate_product_description(prompt_value)
-        product.save()
-        return redirect('product_list')
+    """View to add a new product."""
+    if request.method == "POST":
+        form = ProductForm(request.POST)
+        if form.is_valid():
+            product = form.save(commit=False)  
+            
+            if not product.description:
+                product.description = generate_product_description(product.code)
+
+            product.save()
+            messages.success(request, "Product added successfully!")
+            return redirect('product_list')  # ✅ Redirect to product list
+
+    else:
+        form = ProductForm()
+
     return render(request, 'product_form.html', {'form': form})
 
 @login_required
