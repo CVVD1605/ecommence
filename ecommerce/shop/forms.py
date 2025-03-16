@@ -23,14 +23,21 @@ class UserRegistrationForm(forms.ModelForm):
 # 🔹 Customer Form (Uses Only Relevant Fields)
 class CustomerForm(forms.ModelForm):
     class Meta:
+        user = forms.ModelChoiceField(queryset=User.objects.all(), required=True, label="Select User")  # ✅ Allow admin to select a user
         model = Customer
-        fields = ['contact', 'address']  # Removed redundant fields (name, email, status)
+        fields = ["name", "email", "contact", "address"]  # ✅ Ensure "name" and "email" are included
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Enter full name"}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Enter email"}),
+            "contact": forms.TextInput(attrs={"class": "form-control", "placeholder": "Enter contact number"}),
+            "address": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Enter address"}),
+        }
 
 # 🔹 Product Form (Removed Prompt)
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ['code', 'description', 'price', 'qty']  # Kept necessary fields
+        fields = ['code', 'title', 'description', 'price', 'qty', 'image']  # Kept necessary fields
 
 # 🔹 AI Product Description Form (Standalone)
 class ProductAIForm(forms.Form):
@@ -68,11 +75,8 @@ class CartItemForm(forms.ModelForm):
 class FeedbackForm(forms.ModelForm):
     class Meta:
         model = Feedback
-        fields = ['comments']
+        fields = ["comments", "sentiment"]
         widgets = {
-            'comments': forms.Textarea(attrs={
-                'placeholder': 'Your feedback...', 
-                'rows': 5, 
-                'class': 'form-control'
-            }),
+            "comments": forms.Textarea(attrs={"rows": 3, "placeholder": "Write your feedback..."}),
+            "sentiment": forms.Select(),
         }

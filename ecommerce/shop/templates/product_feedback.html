@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Feedback for {{ product.title }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Feedback for {{ product.title }}</h2>
+    
+    {% if product.feedbacks.all %}
+        <ul class="list-group">
+            {% for feedback in product.feedbacks.all %}
+                <li class="list-group-item">
+                    <strong>{{ feedback.user.username }}</strong> - 
+                    <span class="text-warning">⭐ {{ feedback.rating }}/5</span>
+                    <p>{{ feedback.comment }}</p>
+                    <small class="text-muted">{{ feedback.created_at|date:"M d, Y" }}</small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No feedback available.</p>
+    {% endif %}
+
+    <a href="{% url 'product_list' %}" class="btn btn-secondary mt-3">Back to Products</a>
+</div>
+{% endblock %}

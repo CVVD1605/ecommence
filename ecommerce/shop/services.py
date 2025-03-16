@@ -1,8 +1,8 @@
 from .models import Product, PurchaseHeader, PurchaseDetail, Customer  
 from django.conf import settings
-import openai
+# import openai
 
-openai.api_key = settings.OPENAI_API_KEY 
+# openai.api_key = settings.OPENAI_API_KEY 
 
 def chat_with_gpt(user_input):
     """Send user input to OpenAI API and return AI response."""

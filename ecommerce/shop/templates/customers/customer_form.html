@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Add New Customer{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Add New Customer</h1>
+
+    <form method="post" class="card p-4 shadow-sm">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label for="id_user" class="form-label">Assign User</label>
+            {{ form.user }}  <!-- ✅ Allow assigning a user -->
+        </div>
+
+        <div class="mb-3">
+            <label for="id_name" class="form-label">Full Name</label>
+            {{ form.name }}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_email" class="form-label">Email</label>
+            {{ form.email }}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_contact" class="form-label">Contact</label>
+            {{ form.contact }}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_address" class="form-label">Address</label>
+            {{ form.address }}
+        </div>
+
+        <button type="submit" class="btn btn-success">Save Customer</button>
+    </form>
+</div>
+{% endblock %}

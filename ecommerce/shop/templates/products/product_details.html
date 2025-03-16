@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ product.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ product.title }}</h1>
+
+    <div class="card p-3">
+        {% if product.image %}
+    <img src="{{ product.image.url }}" alt="Product Image" class="img-fluid rounded mb-3" style="max-width: 300px;">
+{% else %}
+    <p class="text-muted">No image available.</p>
+{% endif %}
+        <p><strong>Product Code:</strong> {{ product.code }}</p>
+        <p><strong>Description:</strong> {{ product.description }}</p>
+        <p><strong>Price:</strong> ${{ product.price }}</p>
+        <p><strong>Available Stock:</strong> {{ product.qty }}</p>
+
+        <button class="btn btn-primary" onclick="addToCart({{ product.id }})">Add to Cart</button>
+    </div>
+
+    <h2 class="mt-4">User Feedback</h2>
+    <ul class="list-group">
+        {% for feedback in product.product_feedbacks.all %}
+            <li class="list-group-item">
+                <strong>{{ feedback.customer.user.username }}</strong> - 
+                <span class="badge {% if feedback.sentiment == 'Positive' %}bg-success{% elif feedback.sentiment == 'Negative' %}bg-danger{% else %}bg-secondary{% endif %}">
+                    {{ feedback.sentiment }}
+                </span>
+                <p>{{ feedback.comments }}</p>
+                <small>Posted on {{ feedback.created_at|date:"M d, Y" }}</small>
+            </li>
+        {% empty %}
+            <li class="list-group-item text-center">No feedback available.</li>
+        {% endfor %}
+    </ul>
+
+    <h2 class="mt-4">Leave Feedback</h2>
+    {% if user.is_authenticated and not user.is_superuser %}
+        <form method="post" action="{% url 'submit_feedback' product.id %}">
+            {% csrf_token %}
+            <textarea name="comments" class="form-control" rows="3" required placeholder="Write your feedback..."></textarea>
+            <button type="submit" class="btn btn-info mt-2">Submit Feedback</button>
+        </form>
+    {% else %}
+        <p class="text-muted">⚠️ Only logged-in customers can provide feedback.</p>
+    {% endif %}
+    
+</div>
+
+<script>
+    function addToCart(productId) {
+        fetch(`/cart/add/${productId}/`, {  
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",  
+            },
+            body: JSON.stringify({ product_id: productId })  
+        })
+        .then(response => response.json())  
+        .then(data => {
+            if (data.success) {
+                alert('✅ Product added to cart!');
+            } else if (data.error) {
+                alert('⚠️ ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error adding to cart:', error);
+            alert('❌ An error occurred. Please try again.');
+        });
+    }
+</script>
+{% endblock %}

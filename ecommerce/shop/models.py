@@ -1,8 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User  # Use Django's built-in User model
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Customer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255, blank=True, null=True)
     email = models.EmailField(unique=True, blank=True, null=True)
     contact = models.CharField(max_length=15, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
@@ -13,12 +15,14 @@ class Customer(models.Model):
 
 class Product(models.Model):
     code = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=255, default="Untitled Product")  # ✅ Default value added
     description = models.TextField()
-    price = models.FloatField()  # Changed from DecimalField for better calculations
+    price = models.DecimalField(max_digits=10, decimal_places=2)
     qty = models.PositiveIntegerField()
+    image = models.ImageField(upload_to='product/', blank=True, null=True)  
 
     def __str__(self):
-        return self.code
+        return self.title
 
 class Cart(models.Model):
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE)
@@ -63,9 +67,29 @@ class PurchaseDetail(models.Model):
     line_total = models.FloatField()
 
 class Feedback(models.Model):
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="feedback")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="feedback")
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="customer_feedbacks")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="product_feedbacks")
     comments = models.TextField()
-    sentiment_score = models.FloatField(default=0)  # Changed from DecimalField
-    sentiment = models.CharField(max_length=50, blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Sentiment Score (-1 = Negative, 0 = Neutral, +1 = Positive)
+    sentiment_score = models.FloatField(
+        default=0, validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)]
+    )
+
+    # Sentiment Choices (Optional)
+    SENTIMENT_CHOICES = [
+        ("Positive", "Positive 😀"),
+        ("Neutral", "Neutral 😐"),
+        ("Negative", "Negative 😞"),
+    ]
+    sentiment = models.CharField(
+        max_length=50, choices=SENTIMENT_CHOICES, blank=True, null=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)  # ✅ Ensure this exists
+
+    class Meta:
+        unique_together = ("customer", "product")  # ✅ Prevent duplicate feedback
+
+    def __str__(self):
+        return f"Review by {self.customer.user.username} on {self.product}"

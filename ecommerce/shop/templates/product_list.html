@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Product List{% endblock %}
 
@@ -14,7 +15,10 @@
         </div>
     </form>
 
-    <a href="{% url 'create_product' %}" class="btn btn-success mb-3">Add New Product</a>
+    <!-- ✅ Superusers can add new products -->
+    {% if user.is_authenticated and user.is_superuser %}
+        <a href="{% url 'create_product' %}" class="btn btn-success mb-3">Add New Product</a>
+    {% endif %}
 
     <!-- Product Table -->
     <table class="table table-bordered table-striped">
@@ -31,18 +35,28 @@
             {% for product in products %}
             <tr>
                 <td>{{ product.code }}</td>
-                <td>{{ product.description }}</td>
+                <td>
+                    {% if product.image %}
+                        <img src="{{ product.image.url }}" alt="{{ product.title }}" width="100">
+                    {% else %}
+                        <img src="{% static 'media/logo.png' %}" alt="No Image Available" width="100">
+                    {% endif %}
+                </td>
+                            
                 <td>${{ product.price }}</td>
                 <td>{{ product.qty }}</td>
                 <td>
-                    <a href="{% url 'update_product' product.id %}" class="btn btn-warning btn-sm">Edit</a>
-                    <a href="{% url 'delete_product' product.id %}" class="btn btn-danger btn-sm">Delete</a>
-                    <button 
-                        class="btn btn-primary btn-sm"
-                        onclick="addToCart({{ product.id }})">
+                    <a href="{% url 'product_detail' product.id %}" class="btn btn-info btn-sm">View Details</a>
+                    <a href="{% url 'view_feedback' product.id %}" class="btn btn-secondary btn-sm">View Feedback</a>
+
+                    {% if user.is_authenticated and user.is_superuser %}
+                        <a href="{% url 'update_product' product.id %}" class="btn btn-warning btn-sm">Edit</a>
+                        <a href="{% url 'delete_product' product.id %}" class="btn btn-danger btn-sm">Delete</a>
+                    {% endif %}
+
+                    <button class="btn btn-primary btn-sm" onclick="addToCart({{ product.id }})">
                         Add to Cart
                     </button>
-                    <a href="{% url 'submit_feedback' product.id %}" class="btn btn-info btn-sm">Provide Feedback</a>
                 </td>
             </tr>
             {% empty %}
@@ -56,15 +70,15 @@
 
 <script>
     function addToCart(productId) {
-        fetch(`/cart/add/${productId}/`, {  // ✅ Ensure correct URL
+        fetch(`/cart/add/${productId}/`, {  
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}",  // ✅ CSRF token is required
+                "X-CSRFToken": "{{ csrf_token }}",  
             },
-            body: JSON.stringify({ product_id: productId })  // ✅ Ensure correct JSON body
+            body: JSON.stringify({ product_id: productId })  
         })
-        .then(response => response.json())  // ✅ Expect JSON response
+        .then(response => response.json())  
         .then(data => {
             if (data.success) {
                 alert('✅ Product added to cart!');
@@ -78,4 +92,5 @@
         });
     }
 </script>
+
 {% endblock %}

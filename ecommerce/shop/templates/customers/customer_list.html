@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Customer List{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Customer List</h1>
+
+    <a href="{% url 'create_customer' %}" class="btn btn-success mb-3">Add New Customer</a>
+
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Contact</th>
+                <th>Address</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for customer in customers %}
+            <tr>
+                <td>{{ customer.user.username }}</td>  <!-- ✅ Display username -->
+                <td>{{ customer.email|default:"-" }}</td>
+                <td>
+                    <input type="text" id="contact-{{ customer.id }}" value="{{ customer.contact|default:'' }}" class="form-control">
+                </td>
+                <td>
+                    <input type="text" id="address-{{ customer.id }}" value="{{ customer.address|default:'' }}" class="form-control">
+                </td>
+                <td>
+                    <button class="btn btn-warning btn-sm" onclick="editCustomer({{ customer.id }})">Save</button>
+                    <a href="{% url 'delete_customer' customer.id %}" class="btn btn-danger btn-sm">Delete</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center">No customers found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function editCustomer(customerId) {
+    const contactValue = document.getElementById(`contact-${customerId}`).value.trim();
+    const addressValue = document.getElementById(`address-${customerId}`).value.trim();
+
+    fetch(`/customers/${customerId}/edit/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({ contact: contactValue, address: addressValue })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("✅ Customer updated successfully!");
+            location.reload(); // ✅ Reload the page to reflect changes
+        } else {
+            alert("❌ Error: " + data.error);
+        }
+    })
+    .catch(error => {
+        console.error("Error updating customer:", error);
+        alert("❌ An error occurred. Please try again.");
+    });
+}
+
+// ✅ Function to Get CSRF Token
+function getCSRFToken() {
+    const csrfToken = document.cookie.split("; ").find(row => row.startsWith("csrftoken"));
+    return csrfToken ? csrfToken.split("=")[1] : "";
+}
+
+    // function editCustomer(customerId) {
+    //     const contactValue = document.getElementById(`contact-${customerId}`).value.trim();
+    //     const addressValue = document.getElementById(`address-${customerId}`).value.trim();
+
+    //     fetch(`/customers/${customerId}/edit/`, {
+    //         method: "POST",
+    //         headers: {
+    //             "Content-Type": "application/json",
+    //             "X-CSRFToken": "{{ csrf_token }}"
+    //         },
+    //         body: JSON.stringify({ contact: contactValue, address: addressValue })
+    //     })
+    //     .then(response => response.json())
+    //     .then(data => {
+    //         if (data.success) {
+    //             alert("✅ Customer updated successfully!");
+    //         } else {
+    //             alert("❌ Error: " + data.error);
+    //         }
+    //     })
+    //     .catch(error => {
+    //         console.error("Error updating customer:", error);
+    //         alert("❌ An error occurred. Please try again.");
+    //     });
+    // }
+</script>
+
+{% endblock %}

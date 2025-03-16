@@ -1,6 +1,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from .views import edit_customer, create_customer, view_feedback, update_product, delete_product, product_detail, update_customer
 
 urlpatterns = [
     # 🔹 Home & Authentication
@@ -12,15 +13,17 @@ urlpatterns = [
 
     # 🔹 Customers
     path('customers/', views.list_customers, name='customer_list'),
-    path('customers/add/', views.create_customer, name='create_customer'),
-    path('customers/<int:pk>/edit/', views.update_customer, name='update_customer'),
+    path('customers/add/', views.create_customer, name='create_customer'),  # ✅ Ensure this exists
+    path("customers/<int:customer_id>/edit/", update_customer, name="update_customer"),
     path('customers/<int:pk>/delete/', views.delete_customer, name='delete_customer'),
 
     # 🔹 Products
     path('products/', views.list_products, name='product_list'),
     path('products/add/', views.create_product, name='create_product'),
-    path('products/<int:pk>/edit/', views.update_product, name='update_product'),
-    path('products/<int:pk>/delete/', views.delete_product, name='delete_product'),
+    path('products/<int:product_id>/edit/', views.update_product, name='update_product'),
+    path('products/<int:product_id>/delete/', views.delete_product, name='delete_product'),
+    path("products/<int:product_id>/", views.product_detail, name="product_detail"),
+    path('products/<int:product_id>/feedback/', view_feedback, name='view_feedback'),
 
     # 🔹 AI-Generated Product Descriptions
     path('generate-description/', views.generate_description, name='generate_description'),
@@ -39,6 +42,6 @@ urlpatterns = [
     path('checkout/', views.checkout, name='checkout'),
 
     # 🔹 Feedback & Sentiment Analysis
-    path('feedback/submit/<int:product_id>/', views.submit_feedback, name='submit_feedback'),
-    path('feedback/view/<int:product_id>/', views.view_feedback, name='view_feedback'),
+    path('feedback/submit_feedback/<int:product_id>/', views.submit_feedback, name='submit_feedback'),
+    # path('feedback/view/<int:product_id>/', views.view_feedback, name='view_feedback'),
 ]

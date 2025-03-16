@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ form.instance.pk|yesno:"Edit Product,Add Product" }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ form.instance.pk|yesno:"Edit Product,Add Product" }}</h1>
+
+    <!-- ✅ Updated Form for Product Creation & Editing -->
+    <form method="post" id="product-form" enctype="multipart/form-data" style="max-width: 500px;">
+        {% csrf_token %}
+
+        <!-- ✅ NEW: Title Field for Updating Product Name -->
+        <div class="mb-3">
+            <label for="id_title" class="form-label">Product Name:</label>
+            {{ form.title }}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_code" class="form-label">Product Code:</label>
+            {{ form.code }}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_prompt" class="form-label">Prompt:</label>
+            <input type="text" id="id_prompt" name="prompt" class="form-control" placeholder="Enter a prompt..." required>
+        </div>
+
+        <!-- ✅ Generate Description Button -->
+        <button type="button" id="generate-description" class="btn btn-secondary mb-3">Generate Description</button>
+
+        <div class="mb-3">
+            <label for="id_description" class="form-label">Description:</label>
+            <textarea id="id_description" name="description" rows="3" class="form-control" placeholder="Generated description will appear here..."></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label for="id_price" class="form-label">Price:</label>
+            {{ form.price }}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_qty" class="form-label">Quantity:</label>
+            {{ form.qty }}
+        </div>
+
+        <!-- ✅ Updated: Image Upload Field with Preview -->
+        <div class="mb-3">
+            <label for="id_image" class="form-label">Product Image:</label>
+            {{ form.image }}
+
+            <!-- ✅ Image Preview Section -->
+            <div class="mt-2">
+                <img id="image-preview" src="{% if form.instance.image %}{{ form.instance.image.url }}{% else %}#{% endif %}" 
+                     alt="Preview" 
+                     style="display:{% if form.instance.image %}block{% else %}none{% endif %}; 
+                            max-width: 100%; height: auto; border: 1px solid #ddd; padding: 5px; border-radius: 5px;">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-success mt-2">Save Product</button>
+    </form>
+
+    <a href="{% url 'product_list' %}" class="btn btn-secondary mt-3">Back to Products</a>
+
+    <!-- ✅ Error Display -->
+    <p id="error-message" class="text-danger fw-bold mt-3" style="display: none;"></p>
+</div>
+
+<!--  ✅ JavaScript for AI Description Generation & Image Preview -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const generateButton = document.getElementById("generate-description");
+        const promptField = document.getElementById("id_prompt");
+        const descriptionField = document.getElementById("id_description");
+        const errorMessage = document.getElementById("error-message");
+        const imageInput = document.getElementById("id_image");
+        const imagePreview = document.getElementById("image-preview");
+
+        // ✅ Ensure Image Preview is Updated
+        imageInput.addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = "block";
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // ✅ Ensure Generate Description Works Properly
+        if (!generateButton || !promptField || !descriptionField) {
+            console.error("⚠️ Missing elements in the DOM. Ensure 'id_prompt' and 'id_description' exist.");
+            return;
+        }
+
+        generateButton.addEventListener("click", function () {
+            const promptValue = promptField.value.trim();
+
+            if (!promptValue) {
+                errorMessage.textContent = "⚠️ Please enter a prompt to generate the description.";
+                errorMessage.style.display = "block";
+                return;
+            }
+
+            errorMessage.style.display = "none";  // ✅ Clear previous error messages
+
+            console.log("✅ Generate Description button clicked!");
+
+            fetch("{% url 'generate_description' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": "{{ csrf_token }}",
+                },
+                body: new URLSearchParams({ prompt: promptValue }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.description) {
+                    descriptionField.value = data.description;
+                } else if (data.error) {
+                    errorMessage.textContent = `❌ ${data.error}`;
+                    errorMessage.style.display = "block";
+                }
+            })
+            .catch(error => {
+                console.error("❌ Error generating description:", error);
+                errorMessage.textContent = "❌ An error occurred while generating the description.";
+                errorMessage.style.display = "block";
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,13 +1,10 @@
 #  Standard Library Imports
-import openai
-import google.generativeai as genai
+# import openai
 import json
 
 # Third-Party Library Imports
 import google.generativeai as genai
 from transformers import pipeline
-import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
 
 # Django Core Imports
 from django.conf import settings
@@ -19,22 +16,35 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import user_passes_test
 
 # Local Imports (App-Specific)
 from .models import Customer, Product, Cart, CartItem, PurchaseHeader, PurchaseDetail, Feedback
 from .forms import UserRegistrationForm, CustomerForm, ProductForm, FeedbackForm, CartItemForm
 from .services import recommend_products_for_user
+from .utils import analyze_sentiment
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
-
-# Download sentiment model only once (not at runtime)
-nltk.download('vader_lexicon')
-sia = SentimentIntensityAnalyzer()
 
 # Load Hugging Face pipeline globally (avoid reloading per request)
 description_generator = pipeline('text-generation', model='gpt2')
 
 # ----------------- 🔹 USER AUTHENTICATION VIEWS 🔹 -----------------
+
+
+def is_superuser(user):
+    return user.is_authenticated and user.is_superuser
+
+
+@user_passes_test(is_superuser)
+def list_customers(request):
+    """ View all customers - Only for Admin/Superusers """
+    if not request.user.is_superuser:
+        # Restrict non-superusers
+        return render(request, "403.html", status=403)
+
+    customers = Customer.objects.all()
+    return render(request, "customers/customer_list.html", {"customers": customers})
 
 
 def register(request):
@@ -94,26 +104,95 @@ def home(request):
 
 @login_required
 def create_customer(request):
-    form = CustomerForm(request.POST or None)
-    if form.is_valid():
-        form.save()
-        return redirect('customer_list')
-    return render(request, 'customer_form.html', {'form': form})
+    """ Allow superusers to add a new customer """
+    if not request.user.is_superuser:
+        messages.error(request, "You do not have permission to add customers.")
+        return redirect("customer_list")
+
+    if request.method == "POST":
+        form = CustomerForm(request.POST)
+        if form.is_valid():
+            customer = form.save(commit=False)
+
+            # ✅ Ensure the customer is linked to a user
+            # Retrieve user_id from the form
+            user_id = request.POST.get("user_id")
+            if user_id:
+                customer.user = User.objects.get(id=user_id)
+            else:
+                messages.error(
+                    request, "❌ Please select a user for the customer.")
+                return render(request, "customers/customer_form.html", {"form": form})
+
+            customer.save()
+            messages.success(request, "✅ Customer added successfully!")
+            return redirect("customer_list")
+        else:
+            messages.error(
+                request, "❌ Failed to add customer. Please check the form.")
+
+    else:
+        form = CustomerForm()
+
+    return render(request, "customers/customer_form.html", {"form": form})
 
 
 @login_required
-def list_customers(request):
-    return render(request, 'customer_list.html', {'customers': Customer.objects.all()})
+def edit_customer(request, customer_id):
+    """ Update only contact and address fields for a customer (Inline Editing) """
+    if request.method == "POST":
+        try:
+            customer = get_object_or_404(Customer, id=customer_id)
 
+            # ✅ Ensure only the owner or superuser can edit
+            if request.user != customer.user and not request.user.is_superuser:
+                return JsonResponse({"error": "Unauthorized"}, status=403)
+
+            # ✅ Parse JSON request body
+            data = json.loads(request.body)
+            customer.contact = data.get("contact", customer.contact)
+            customer.address = data.get("address", customer.address)
+            customer.save()
+
+            return JsonResponse({"success": True, "contact": customer.contact, "address": customer.address})
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @login_required
-def update_customer(request, pk):
-    customer = get_object_or_404(Customer, pk=pk)
-    form = CustomerForm(request.POST or None, instance=customer)
-    if form.is_valid():
-        form.save()
-        return redirect('customer_list')
-    return render(request, 'customer_form.html', {'form': form})
+def update_customer(request, customer_id):
+    """ Update only contact and address fields for a customer """
+    customer = get_object_or_404(Customer, id=customer_id)
+
+    # ✅ Ensure only the owner or superuser can edit
+    if request.user != customer.user and not request.user.is_superuser:
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)  # ✅ Parse JSON request body
+            customer.contact = data.get("contact", customer.contact)
+            customer.address = data.get("address", customer.address)
+            customer.save()
+
+            return JsonResponse({"success": True})
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+# def update_customer(request, pk):
+#     customer = get_object_or_404(Customer, pk=pk)
+#     if request.method == 'POST':
+#         form = CustomerForm(request.POST, instance=customer)
+#         if form.is_valid():
+#             form.save()
+#             return redirect('customer_list')
+#     else:
+#         form = CustomerForm(instance=customer)
+#     return render(request, 'update_customer.html', {'form': form})
 
 
 @login_required
@@ -125,6 +204,7 @@ def delete_customer(request, pk):
     return render(request, 'customer_confirm_delete.html', {'customer': customer})
 
 # ----------------- 🔹 PRODUCT RECOMMENDATION & GENERATION 🔹 -----------------
+
 
 @csrf_exempt
 def chatbot_response(request):
@@ -146,6 +226,7 @@ def chatbot_response(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request method"}, status=405)
+
 
 def generate_product_description(name):
     """Generate AI-based product descriptions."""
@@ -185,24 +266,20 @@ def generate_description(request):
 
 @login_required
 def create_product(request):
-    """View to add a new product."""
+    """ Allow only superusers to add products """
+    if not request.user.is_superuser:
+        return redirect("product_list")  # Normal users get redirected
+
     if request.method == "POST":
-        form = ProductForm(request.POST)
+        form = ProductForm(request.POST, request.FILES) #handles file uploads
         if form.is_valid():
-            product = form.save(commit=False)
-
-            if not product.description:
-                product.description = generate_product_description(
-                    product.code)
-
-            product.save()
-            messages.success(request, "Product added successfully!")
-            return redirect('product_list')  # ✅ Redirect to product list
-
+            form.save()
+            messages.success(request, "✅ Product added successfully!")
+            return redirect("product_list")
     else:
         form = ProductForm()
 
-    return render(request, 'product_form.html', {'form': form})
+    return render(request, "products/product_form.html", {"form": form})
 
 
 @login_required
@@ -212,20 +289,23 @@ def list_products(request):
         description__icontains=query) if query else Product.objects.all()
     return render(request, 'product_list.html', {'products': products})
 
-
 @login_required
-def update_product(request, pk):
-    """Updates an existing product."""
-    product = get_object_or_404(Product, pk=pk)
+def update_product(request, product_id):
+    """View to edit a product"""
+    product = get_object_or_404(Product, id=product_id)
+
     if request.method == "POST":
-        form = ProductForm(request.POST, instance=product)
+        form = ProductForm(request.POST, request.FILES, instance=product)
         if form.is_valid():
             form.save()
-            return redirect('product_list')  # Redirect after saving
+            messages.success(request, "✅ Product updated successfully!")
+            return redirect("product_list")
+        else:
+            messages.error(request, "❌ Please correct the errors below.")
     else:
         form = ProductForm(instance=product)
 
-    return render(request, 'product_form.html', {'form': form, 'product': product})
+    return render(request, "products/product_form.html", {"form": form, "product": product})  
 
 
 @login_required
@@ -268,40 +348,6 @@ def purchase_details(request, purchase_id):
     return render(request, 'purchase_details.html', context)
 
 # ----------------- 🔹 CART FUNCTIONALITY 🔹 -----------------
-# @login_required
-# def cart_detail(request):
-#     """View to display cart details."""
-#     try:
-#         cart_customer, created = Customer.objects.get_or_create(user=request.user, defaults={'email': request.user.email})
-
-#         # ✅ Ensure the cart exists before accessing related fields
-#         cart, created = Cart.objects.get_or_create(customer=cart_customer, defaults={'total': 0})
-
-#         if created:
-#             cart.save()  # ✅ Ensure the cart is saved before querying items
-
-#         cart_items = CartItem.objects.filter(cart=cart)  # ✅ Make sure cart items exist
-
-#         # ✅ AI Recommendations
-#         # recommended_products = recommend_products_for_user(request.user)
-
-#         print(f"🛒 Cart for {cart_customer}: {cart}")  # ✅ Debugging Print
-#         print(f"📦 Items in Cart: {cart_items.count()}")  # ✅ Debugging Print
-
-#         return render(request, 'cart_detail.html', {
-#             'cart': cart,
-#             'cart_items': cart_items
-#             # 'recommended_products': recommended_products
-#         })
-
-#     except Customer.DoesNotExist:
-#         messages.error(request, "No customer profile found. Please complete your profile.")
-#         return redirect('profile')
-
-#     except Exception as e:
-#         messages.error(request, f"An error occurred: {str(e)}")
-#         return redirect('product_list')
-
 
 @login_required
 def cart_detail(request):
@@ -465,54 +511,49 @@ def add_to_cart(request, product_id):  # ✅ Ensure function is defined
 
 # ----------------- 🔹 FEEDBACK & SENTIMENT ANALYSIS 🔹 -----------------
 
-
-def analyze_sentiment(self):
-    sia = SentimentIntensityAnalyzer()
-    sentiment_scores = sia.polarity_scores(self.comments)
-    self.sentiment_score = sentiment_scores['compound']
-    if sentiment_scores['compound'] > 0.05:
-        self.sentiment = "Positive"
-    elif sentiment_scores['compound'] < -0.05:
-        self.sentiment = "Negative"
-    else:
-        self.sentiment = "Neutral"
-
-
 @login_required
 def submit_feedback(request, product_id):
-    """View to submit feedback for a product."""
+    """Allow customers to submit feedback for a product."""
     product = get_object_or_404(Product, id=product_id)
 
-    if request.method == 'POST':
+    try:
+        customer = Customer.objects.get(user=request.user)  # ✅ Ensure customer exists
+    except Customer.DoesNotExist:
+        messages.error(request, "⚠️ No customer profile found. Please register first.")
+        return redirect('register')
+
+    # ✅ Prevent duplicate feedback
+    if Feedback.objects.filter(customer=customer, product=product).exists():
+        messages.error(request, "⚠️ You have already submitted feedback for this product!")
+        return redirect('product_detail', product_id=product.id)
+
+    if request.method == "POST":
         form = FeedbackForm(request.POST)
         if form.is_valid():
             feedback = form.save(commit=False)
-
-            # Ensure the correct customer is retrieved
-            try:
-                customer = Customer.objects.get(user=request.user)
-                feedback.customer = customer
-                feedback.product = product
-                analyze_sentiment(feedback)  # ✅ Ensure this function exists
-                feedback.save()
-                messages.success(request, "Thank you for your feedback!")
-                return redirect('product_list')
-
-            except Customer.DoesNotExist:
-                messages.error(
-                    request, "⚠️ No customer profile found. Please register first.")
-                return redirect('register')
+            feedback.customer = customer
+            feedback.product = product
+            feedback.save()
+            messages.success(request, "✅ Thank you for your feedback!")
+            return redirect('product_detail', product_id=product.id)  # ✅ Redirect to product page
+        else:
+            messages.error(request, "❌ Invalid form submission. Please correct the errors.")
 
     else:
         form = FeedbackForm()
 
-    return render(request, 'submit_feedback.html', {'form': form, 'product': product})
-
+    return render(request, "shop/submit_feedback.html", {"form": form, "product": product})
 
 @login_required
 def view_feedback(request, product_id):
-    """View feedback for a product."""
+    """View feedback for a specific product."""
     product = get_object_or_404(Product, id=product_id)
-    feedback_list = Feedback.objects.filter(
-        product=product).select_related('customer').order_by('-created_at')
-    return render(request, 'feedback/view_feedback.html', {'product': product, 'feedback_list': feedback_list})
+
+    feedbacks = Feedback.objects.filter(product=product).order_by("-created_at")  # ✅ Sorting latest first
+
+    return render(request, "feedback/view_feedback.html", {"product": product, "feedbacks": feedbacks})
+
+def product_detail(request, product_id):
+    """View details of a product."""
+    product = get_object_or_404(Product, id=product_id)
+    return render(request, "products/product_details.html", {"product": product})
