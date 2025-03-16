@@ -1,36 +1,59 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Purchase Details</h1>
-<h2>Purchase Information</h2>
-<p><strong>Purchase Date:</strong> {{ purchase_header.purchase_date|date:"Y-m-d H:i" }}</p>
-<p><strong>Total:</strong> ${{ purchase_header.total }}</p>
-<p><strong>Discount:</strong> ${{ purchase_header.discount }}</p>
+{% block title %}Purchase Details{% endblock %}
 
-<h2>Items</h2>
-<table>
-    <thead>
-        <tr>
-            <th>Product</th>
-            <th>Description</th>
-            <th>Quantity</th>
-            <th>Price</th>
-            <th>Discount</th>
-            <th>Line Total</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for detail in purchase_details %}
-        <tr>
-            <td>{{ detail.product.name }}</td>
-            <td>{{ detail.description }}</td>
-            <td>{{ detail.qty }}</td>
-            <td>${{ detail.price }}</td>
-            <td>${{ detail.discount }}</td>
-            <td>${{ detail.line_total }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-<a href="{% url 'purchase_history' %}">Back to History</a>
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">📜 Purchase Details</h1>
+
+    <!-- Purchase Info Section -->
+    <div class="card shadow-sm p-3 mb-4">
+        <h2 class="h5 text-primary">🛍️ Purchase Information</h2>
+        <p><strong>📅 Purchase Date:</strong> {{ purchase_header.purchase_date|date:"Y-m-d H:i" }}</p>
+        <p><strong>💰 Total:</strong> <span class="fw-bold text-success">${{ purchase_header.total }}</span></p>
+        <p><strong>🎟️ Discount:</strong> 
+            {% if purchase_header.discount > 0 %}
+                <span class="badge bg-success">-${{ purchase_header.discount }}</span>
+            {% else %}
+                <span class="text-muted">No Discount</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Purchased Items Table -->
+    <h2 class="h5">🛒 Purchased Items</h2>
+    <table class="table table-bordered table-striped text-center align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>📦 Product</th>
+                <th>Description</th>
+                <th>🔢 Quantity</th>
+                <th>💲 Price</th>
+                <th>🎟️ Discount</th>
+                <th>💵 Line Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detail in purchase_details %}
+            <tr>
+                <td class="fw-bold">{{ detail.product.name }}</td>
+                <td>{{ detail.description }}</td>
+                <td>{{ detail.qty }}</td>
+                <td>${{ detail.price }}</td>
+                <td>
+                    {% if detail.discount > 0 %}
+                        <span class="badge bg-warning text-dark">-${{ detail.discount }}</span>
+                    {% else %}
+                        <span class="text-muted">No Discount</span>
+                    {% endif %}
+                </td>
+                <td class="fw-bold text-success">${{ detail.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Back Button -->
+    <a href="{% url 'purchase_history' %}" class="btn btn-secondary mt-3">⬅️ Back to History</a>
+</div>
 {% endblock %}

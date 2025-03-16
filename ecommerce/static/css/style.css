@@ -1,0 +1,38 @@
+/* Ensure Product Images Have a Uniform Size */
+.product-image {
+    height: 200px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+/* Ensure All Cards Have Equal Heights */
+.card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Ensure Card Content is Aligned */
+.card-body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Keep Buttons at the Bottom of Each Card */
+.mt-auto {
+    margin-top: auto;
+}
+
+/* Chatbot message animations */
+.bot-response {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Submit Feedback{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Submit Feedback for {{ product.name }}</h2>
+
+    <form id="feedback-form" method="post">
+        {% csrf_token %}
+        
+        <div class="mb-3">
+            <label for="id_comments" class="form-label">Your Feedback:</label>
+            <textarea id="id_comments" name="comments" class="form-control" rows="3" required placeholder="Write your feedback..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit Feedback</button>
+    </form>
+
+    <a href="{% url 'product_detail' product.id %}" class="btn btn-secondary mt-3">Back to Product</a>
+</div>
+{% endblock %}
+
+<script>
+    document.getElementById("submit-feedback").addEventListener("click", function () {
+    const userInput = document.getElementById("feedback-input").value.trim();
+
+    if (!userInput) {
+        alert("⚠️ Please enter your feedback.");
+        return;
+    }
+
+    fetch("/feedback/submit_feedback/{{ product.id }}/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({ comments: userInput })  // ✅ Send as JSON
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.success);
+            location.reload();  // ✅ Refresh to show new feedback
+        } else if (data.error) {
+            alert("❌ " + data.error);
+        }
+    })
+    .catch(error => {
+        console.error("Error submitting feedback:", error);
+        alert("❌ An error occurred. Please try again.");
+    });
+});
+
+</script>
+
+
+

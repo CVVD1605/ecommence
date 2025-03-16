@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ product.title }}{% endblock %}
 
@@ -6,71 +7,96 @@
 <div class="container mt-4">
     <h1 class="mb-4">{{ product.title }}</h1>
 
-    <div class="card p-3">
+    <!-- Product Info -->
+    <div class="card p-3 shadow-sm">
         {% if product.image %}
-    <img src="{{ product.image.url }}" alt="Product Image" class="img-fluid rounded mb-3" style="max-width: 300px;">
-{% else %}
-    <p class="text-muted">No image available.</p>
-{% endif %}
-        <p><strong>Product Code:</strong> {{ product.code }}</p>
+            <img src="{{ product.image.url }}" alt="{{ product.title }}" class="img-fluid rounded mb-3" style="max-width: 300px;">
+        {% endif %}
+        <p><strong>Code:</strong> {{ product.code }}</p>
         <p><strong>Description:</strong> {{ product.description }}</p>
-        <p><strong>Price:</strong> ${{ product.price }}</p>
+        <p><strong>Price:</strong> <span class="text-success fw-bold">${{ product.price }}</span></p>
         <p><strong>Available Stock:</strong> {{ product.qty }}</p>
-
-        <button class="btn btn-primary" onclick="addToCart({{ product.id }})">Add to Cart</button>
+        <button class="btn btn-primary" onclick="addToCart({{ product.id }})">🛒 Add to Cart</button>
     </div>
 
-    <h2 class="mt-4">User Feedback</h2>
-    <ul class="list-group">
+    <!-- 📝 User Feedback Section -->
+    <h2 class="mt-5">User Feedback</h2>
+    <div class="list-group" id="feedback-list">
         {% for feedback in product.product_feedbacks.all %}
-            <li class="list-group-item">
-                <strong>{{ feedback.customer.user.username }}</strong> - 
-                <span class="badge {% if feedback.sentiment == 'Positive' %}bg-success{% elif feedback.sentiment == 'Negative' %}bg-danger{% else %}bg-secondary{% endif %}">
-                    {{ feedback.sentiment }}
-                </span>
-                <p>{{ feedback.comments }}</p>
-                <small>Posted on {{ feedback.created_at|date:"M d, Y" }}</small>
-            </li>
+            <div class="list-group-item d-flex align-items-start border rounded mb-2 p-3">
+                <img src="https://www.gravatar.com/avatar/{{ feedback.customer.user.email|lower|make_list|join:'-' }}?d=identicon" 
+                     alt="User Avatar" class="rounded-circle me-3" width="50" height="50">
+                <div>
+                    <h6 class="mb-1">{{ feedback.customer.user.username }}</h6>
+                    <p class="mb-1">{{ feedback.comments }}</p>
+                    <span class="badge {% if feedback.sentiment == 'Positive' %}bg-success{% elif feedback.sentiment == 'Negative' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        {{ feedback.sentiment }}
+                    </span>
+                    <small class="text-muted d-block">Posted on {{ feedback.created_at|date:"M d, Y" }}</small>
+                </div>
+            </div>
         {% empty %}
-            <li class="list-group-item text-center">No feedback available.</li>
+            <p class="alert alert-warning">⚠️ No feedback available.</p>
         {% endfor %}
-    </ul>
+    </div>
 
-    <h2 class="mt-4">Leave Feedback</h2>
+    <!-- 💬 Leave Feedback Form -->
     {% if user.is_authenticated and not user.is_superuser %}
-        <form method="post" action="{% url 'submit_feedback' product.id %}">
+        <h2 class="mt-4">Leave Feedback</h2>
+        <form id="feedback-form" method="post">
             {% csrf_token %}
-            <textarea name="comments" class="form-control" rows="3" required placeholder="Write your feedback..."></textarea>
-            <button type="submit" class="btn btn-info mt-2">Submit Feedback</button>
+            <textarea id="feedback-text" class="form-control" rows="3" required placeholder="Write your feedback..."></textarea>
+            <button type="button" class="btn btn-info mt-2" id="submit-feedback">Submit Feedback</button>
         </form>
     {% else %}
-        <p class="text-muted">⚠️ Only logged-in customers can provide feedback.</p>
+        <p class="text-muted">🔒 Login to provide feedback.</p>
     {% endif %}
-    
 </div>
 
+<!-- ✅ JavaScript for AJAX Submission -->
 <script>
-    function addToCart(productId) {
-        fetch(`/cart/add/${productId}/`, {  
+    document.getElementById("submit-feedback").addEventListener("click", function () {
+        let feedbackText = document.getElementById("feedback-text").value.trim();
+        if (!feedbackText) {
+            alert("⚠️ Please enter your feedback.");
+            return;
+        }
+
+        fetch("{% url 'submit_feedback' product.id %}", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}",  
+                "X-CSRFToken": "{{ csrf_token }}"
             },
-            body: JSON.stringify({ product_id: productId })  
+            body: JSON.stringify({ comments: feedbackText })
         })
-        .then(response => response.json())  
+        .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('✅ Product added to cart!');
-            } else if (data.error) {
-                alert('⚠️ ' + data.error);
+                let feedbackList = document.getElementById("feedback-list");
+                let newFeedback = `
+                    <div class="list-group-item d-flex align-items-start border rounded mb-2 p-3">
+                        <img src="https://www.gravatar.com/avatar/{{ user.email|lower|make_list|join:'-' }}?d=identicon"
+                            alt="User Avatar" class="rounded-circle me-3" width="50" height="50">
+                        <div>
+                            <h6 class="mb-1">{{ user.username }}</h6>
+                            <p class="mb-1">${feedbackText}</p>
+                            <span class="badge bg-secondary">Pending Analysis</span>
+                            <small class="text-muted d-block">Just Now</small>
+                        </div>
+                    </div>
+                `;
+                feedbackList.innerHTML = newFeedback + feedbackList.innerHTML;
+                document.getElementById("feedback-text").value = ""; // ✅ Clear input field
+            } else {
+                alert("❌ Error: " + data.error);
             }
         })
         .catch(error => {
-            console.error('Error adding to cart:', error);
-            alert('❌ An error occurred. Please try again.');
+            console.error("Error submitting feedback:", error);
+            alert("❌ An error occurred. Please try again.");
         });
-    }
+    });
 </script>
+
 {% endblock %}

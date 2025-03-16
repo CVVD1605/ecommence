@@ -77,6 +77,6 @@ class FeedbackForm(forms.ModelForm):
         model = Feedback
         fields = ["comments", "sentiment"]
         widgets = {
-            "comments": forms.Textarea(attrs={"rows": 3, "placeholder": "Write your feedback..."}),
+            'comments': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Write your feedback...'}),
             "sentiment": forms.Select(),
         }

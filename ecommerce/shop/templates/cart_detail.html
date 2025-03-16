@@ -1,71 +1,106 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Shopping Cart{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h1>🛒 Shopping Cart</h1>
+    <h1 class="mb-4">🛒 Shopping Cart</h1>
 
     {% if cart_items %}
-        <table class="table">
-            <thead>
+        <table class="table table-bordered text-center align-middle">
+            <thead class="table-dark">
                 <tr>
                     <th>Product</th>
+                    <th>Image</th>
                     <th>Quantity</th>
                     <th>Price</th>
                     <th>Total</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in cart_items %}
-                <tr>
-                    <td>{{ item.product.description }}</td>
-                    <td>{{ item.qty }}</td>
+                <tr id="cart-item-{{ item.id }}">
+                    <td><strong>{{ item.product.code }}</strong></td>
+                    <td>
+                        {% if item.product.image %}
+                            <img src="{{ item.product.image.url }}" alt="{{ item.product.code }}" width="80" class="img-thumbnail">
+                        {% else %}
+                            <img src="{% static 'media/logo.png' %}" alt="No Image" width="80" class="img-thumbnail">
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="input-group" style="max-width: 120px; margin: auto;">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="updateQuantity({{ item.id }}, -1)">➖</button>
+                            <input type="text" class="form-control text-center" id="qty-{{ item.id }}" value="{{ item.qty }}" readonly>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="updateQuantity({{ item.id }}, 1)">➕</button>
+                        </div>
+                    </td>
                     <td>${{ item.price }}</td>
-                    <td>${{ item.line_total }}</td>
+                    <td><strong id="total-{{ item.id }}">${{ item.line_total }}</strong></td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="removeFromCart({{ item.id }})">🗑️ Remove</button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
-        <h3>Total: ${{ cart.total }}</h3>
+        <div class="text-end">
+            <h3 class="fw-bold">Total: $<span id="cart-total">{{ cart.total }}</span></h3>
 
-        <form method="post" action="{% url 'checkout' %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-success">Complete Purchase</button>
-        </form>
+            <form method="post" action="{% url 'checkout' %}" class="mt-3">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success btn-lg">✅ Complete Purchase</button>
+            </form>
+        </div>
     {% else %}
-        <p class="alert alert-warning">⚠️ Your cart is empty.</p>
+        <p class="alert alert-warning text-center">⚠️ Your cart is empty.</p>
     {% endif %}
+
+    <!-- ✅ Continue Shopping Button -->
+    <div class="mt-4">
+        <a href="{% url 'product_list' %}" class="btn btn-outline-primary">⬅️ Continue Shopping</a>
+    </div>
 
     <!-- ✅ AI-Powered Recommended Products Section -->
     {% if recommended_products %}
-    <h3>✨ Recommended for You</h3>
+    <h3 class="mt-5 mb-3">✨ Recommended for You</h3>
     <div class="row">
         {% for product in recommended_products %}
-            <div class="col-md-4 mb-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ product.code }}</h5>  <!-- ✅ Fix: Use 'code' instead of 'name' -->
-                        <p class="card-text">{{ product.description }}</p>
-                        <p><strong>Price:</strong> ${{ product.price }}</p>
-                        <button class="btn btn-primary" onclick="addToCart('{{ product.id }}')">Add to Cart</button>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                    {% if product.image %}
+                        <img src="{{ product.image.url }}" alt="{{ product.code }}" class="card-img-top" style="height: 200px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'media/logo.png' %}" alt="No Image Available" class="card-img-top" style="height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body text-center">
+                        <h5 class="card-title fw-bold">{{ product.code }}</h5>
+                        <p class="card-text text-muted">{{ product.description|truncatewords:12 }}</p>
+                        <p class="text-success fw-bold">${{ product.price }}</p>
+                        <button class="btn btn-primary btn-sm w-100" onclick="addToCart('{{ product.id }}')">🛍️ Add to Cart</button>
                     </div>
                 </div>
             </div>
         {% endfor %}
     </div>
-{% endif %}
-
+    {% endif %}
 </div>
 
+<!-- ✅ JavaScript for Quantity Update & Remove -->
 <script>
+    function getCSRFToken() {
+        return document.cookie.split("; ").find(row => row.startsWith("csrftoken"))?.split("=")[1];
+    }
+
     function addToCart(productId) {
         fetch(`/cart/add/${productId}/`, {  
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}",
+                "X-CSRFToken": getCSRFToken(),  // ✅ CSRF Token added
             },
             body: JSON.stringify({ product_id: productId })
         })
@@ -73,14 +108,65 @@
         .then(data => {
             if (data.success) {
                 alert('✅ Product added to cart!');
-                location.reload();
-            } else if (data.error) {
+                location.reload();  // ✅ Refresh to update UI
+            } else {
                 alert('⚠️ ' + data.error);
             }
         })
         .catch(error => {
-            console.error('Error adding to cart:', error);
+            console.error('❌ Error adding to cart:', error);
             alert('❌ An error occurred. Please try again.');
+        });
+    }
+
+    function updateQuantity(cartItemId, change) {
+        let qtyField = document.getElementById(`qty-${cartItemId}`);
+        let newQty = parseInt(qtyField.value) + change;
+
+        if (newQty < 1) return;  // Prevent zero quantity
+
+        fetch(`/cart/update/${cartItemId}/`, {  
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+            },
+            body: JSON.stringify({ qty: newQty })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                qtyField.value = newQty;
+                document.getElementById(`total-${cartItemId}`).textContent = `$${data.new_total}`;
+                document.getElementById("cart-total").textContent = data.cart_total;
+            } else {
+                alert("⚠️ " + data.error);
+            }
+        })
+        .catch(error => {
+            console.error("Error updating quantity:", error);
+        });
+    }
+
+    function removeFromCart(cartItemId) {
+        fetch(`/cart/remove/${cartItemId}/`, {  
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById(`cart-item-${cartItemId}`).remove();
+                document.getElementById("cart-total").textContent = data.cart_total;
+            } else {
+                alert("⚠️ " + data.error);
+            }
+        })
+        .catch(error => {
+            console.error("Error removing item:", error);
         });
     }
 </script>

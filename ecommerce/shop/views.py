@@ -1,7 +1,6 @@
 #  Standard Library Imports
 # import openai
 import json
-
 # Third-Party Library Imports
 import google.generativeai as genai
 from transformers import pipeline
@@ -23,6 +22,9 @@ from .models import Customer, Product, Cart, CartItem, PurchaseHeader, PurchaseD
 from .forms import UserRegistrationForm, CustomerForm, ProductForm, FeedbackForm, CartItemForm
 from .services import recommend_products_for_user
 from .utils import analyze_sentiment
+from shop.forms import FeedbackForm
+from shop.models import Product, Customer, Feedback, Cart, CartItem, PurchaseHeader, PurchaseDetail
+
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
@@ -366,21 +368,27 @@ def cart_detail(request):
 
         cart_items = cart.items.all()
 
+        # ✅ Debugging: Print cart items
+        print(f"🛒 Debug: Cart contains {len(cart_items)} items for user {request.user.username}")
+
         # ✅ AI-Powered Recommendations
         recommended_products = recommend_products_for_user(request.user)
+
+        # ✅ Debugging: Check if recommendations exist
+        if recommended_products:
+            print(f"✅ Debug: Found {len(recommended_products)} recommended products for {request.user.username}")
+        else:
+            print("⚠️ Debug: No recommended products found!")
 
         return render(request, 'cart_detail.html', {
             'cart': cart,
             'cart_items': cart_items,
-            # ✅ Pass recommendations to template
-            'recommended_products': recommended_products
+            'recommended_products': recommended_products  # ✅ Pass to template
         })
 
     except Customer.DoesNotExist:
-        messages.error(
-            request, "⚠️ No customer profile found. Please register first.")
-        print("❌ Error: No customer profile found for user:",
-              request.user.username)  # ✅ Debug print
+        messages.error(request, "⚠️ No customer profile found. Please register first.")
+        print(f"❌ Error: No customer profile found for user {request.user.username}")
         return redirect('register')
 
     except Exception as e:
@@ -465,7 +473,7 @@ def checkout(request):
 
 
 @login_required
-def add_to_cart(request, product_id):  # ✅ Ensure function is defined
+def add_to_cart(request, product_id):  
     """Handles adding a product to the cart."""
     if request.method == "POST":
         try:
@@ -509,40 +517,91 @@ def add_to_cart(request, product_id):  # ✅ Ensure function is defined
 
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
-# ----------------- 🔹 FEEDBACK & SENTIMENT ANALYSIS 🔹 -----------------
+@login_required
+def update_cart_quantity(request, cart_item_id):
+    """ ✅ Updates the quantity of a cart item """
+    if request.method == "POST":
+        try:
+            cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__customer__user=request.user)
+            data = json.loads(request.body)
+            new_qty = data.get("qty")
+
+            if new_qty and int(new_qty) > 0:
+                cart_item.qty = int(new_qty)
+                cart_item.save()
+
+                # ✅ Update cart total
+                cart = cart_item.cart
+                cart.total = sum(item.qty * item.price for item in cart.items.all())
+                cart.save()
+
+                return JsonResponse({"success": True, "new_total": cart_item.qty * cart_item.price, "cart_total": cart.total})
+
+            return JsonResponse({"error": "Invalid quantity"}, status=400)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
 
 @login_required
+def remove_cart_item(request, cart_item_id):
+    """ ✅ Removes an item from the cart """
+    if request.method == "POST":
+        try:
+            cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__customer__user=request.user)
+            cart = cart_item.cart
+
+            cart_item.delete()
+
+            # ✅ Update cart total
+            cart.total = sum(item.qty * item.price for item in cart.items.all())
+            cart.save()
+
+            return JsonResponse({"success": True, "cart_total": cart.total})
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+# ----------------- 🔹 FEEDBACK & SENTIMENT ANALYSIS 🔹 -----------------
+
+# @login_required
+@csrf_exempt  # Remove this if CSRF token is handled in JavaScript
 def submit_feedback(request, product_id):
-    """Allow customers to submit feedback for a product."""
+    """Allow customers to submit feedback via AJAX (JSON)."""
     product = get_object_or_404(Product, id=product_id)
 
     try:
-        customer = Customer.objects.get(user=request.user)  # ✅ Ensure customer exists
+        customer = Customer.objects.get(user=request.user)
     except Customer.DoesNotExist:
-        messages.error(request, "⚠️ No customer profile found. Please register first.")
-        return redirect('register')
-
-    # ✅ Prevent duplicate feedback
-    if Feedback.objects.filter(customer=customer, product=product).exists():
-        messages.error(request, "⚠️ You have already submitted feedback for this product!")
-        return redirect('product_detail', product_id=product.id)
+        return JsonResponse({"error": "⚠️ No customer profile found. Please register first."}, status=400)
 
     if request.method == "POST":
-        form = FeedbackForm(request.POST)
-        if form.is_valid():
-            feedback = form.save(commit=False)
-            feedback.customer = customer
-            feedback.product = product
-            feedback.save()
-            messages.success(request, "✅ Thank you for your feedback!")
-            return redirect('product_detail', product_id=product.id)  # ✅ Redirect to product page
-        else:
-            messages.error(request, "❌ Invalid form submission. Please correct the errors.")
+        try:
+            data = json.loads(request.body)  # ✅ Read JSON data
+            print("🔍 Debug: Received JSON Data -->", data)  # ✅ Debugging
 
-    else:
-        form = FeedbackForm()
+            form = FeedbackForm(data)  # ✅ Pass JSON data to the form
 
-    return render(request, "shop/submit_feedback.html", {"form": form, "product": product})
+            if form.is_valid():
+                feedback = form.save(commit=False)
+                feedback.customer = customer
+                feedback.product = product
+                feedback.save()
+
+                return JsonResponse({"success": "✅ Thank you for your feedback!"})
+
+            else:
+                print("❌ Invalid feedback form:", form.errors)
+                return JsonResponse({"error": "❌ Invalid form submission.", "errors": form.errors}, status=400)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "❌ Invalid JSON format."}, status=400)
+
+    return JsonResponse({"error": "❌ Invalid request method."}, status=405)
+
 
 @login_required
 def view_feedback(request, product_id):

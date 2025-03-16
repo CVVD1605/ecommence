@@ -1,27 +1,47 @@
 {% extends 'base.html' %}
+{% block title %}Purchase History{% endblock %}
 
 {% block content %}
-<h1>Purchase History</h1>
-<table>
-    <thead>
-        <tr>
-            <th>Purchase Date</th>
-            <th>Total</th>
-            <th>Discount</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for header in purchase_headers %}
-        <tr>
-            <td>{{ header.purchase_date|date:"Y-m-d H:i" }}</td>
-            <td>${{ header.total }}</td>
-            <td>${{ header.discount }}</td>
-            <td>
-                <a href="{% url 'purchase_details' header.id %}">View Details</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="container mt-4">
+    <h1 class="mb-4">🛍️ Purchase History</h1>
+
+    {% if purchase_headers %}
+        <table class="table table-bordered table-striped text-center align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>📅 Purchase Date</th>
+                    <th>💰 Total</th>
+                    <th>🎟️ Discount</th>
+                    <th>🔍 Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for header in purchase_headers %}
+                <tr>
+                    <td>{{ header.purchase_date|date:"Y-m-d H:i" }}</td>
+                    <td><strong>${{ header.total }}</strong></td>
+
+                    <!-- ✅ Hide discount if 0 -->
+                    <td>
+                        {% if header.discount > 0 %}
+                            <span class="badge bg-success">-${{ header.discount }}</span>
+                        {% else %}
+                            <span class="text-muted">No Discount</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- ✅ View Details Button -->
+                    <td>
+                        <a href="{% url 'purchase_details' header.id %}" class="btn btn-info btn-sm">
+                            🔍 View Details
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="alert alert-warning">⚠️ No purchases found.</p>
+    {% endif %}
+</div>
 {% endblock %}

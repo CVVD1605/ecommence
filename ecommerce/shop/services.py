@@ -15,24 +15,26 @@ def chat_with_gpt(user_input):
     except Exception as e:
         return f"⚠️ AI Error: {str(e)}"
 def recommend_products_for_user(user):
-    """Recommends products based on user purchase history."""
+    """ AI-based product recommendations for a user """
     try:
-        # ✅ Fetch customer linked to user
-        customer = Customer.objects.get(user=user)
+        # ✅ Debugging: Print user info
+        print(f"🔍 Debug: Generating recommendations for user {user.username}")
 
-        # ✅ Get all purchases by this customer
-        purchase_history = PurchaseHeader.objects.filter(customer=customer)
+        # ✅ Retrieve all products
+        all_products = Product.objects.all()
+        print(f"✅ Debug: Found {len(all_products)} total products in database.")
 
-        if not purchase_history.exists():
-            return []  # No recommendations if user has no purchases
+        # ✅ Apply your recommendation logic here
+        recommended_products = all_products[:3]  # Example: Just take the first 3 products
 
-        # ✅ Get purchased product IDs
-        purchased_products = PurchaseDetail.objects.filter(purchaseHeader__in=purchase_history).values_list('product', flat=True)
+        # ✅ Debugging: Check recommended products
+        if recommended_products:
+            print(f"✅ Debug: Returning {len(recommended_products)} recommended products.")
+        else:
+            print("⚠️ Debug: No products selected for recommendation.")
 
-        # ✅ Recommend products the user has NOT purchased
-        recommendations = Product.objects.exclude(id__in=purchased_products)[:5]
+        return recommended_products
 
-        return list(recommendations.values('id', 'code', 'description', 'price'))
-
-    except Customer.DoesNotExist:
-        return []  # No customer found, return empty recommendations
+    except Exception as e:
+        print(f"❌ Error in recommend_products_for_user(): {str(e)}")
+        return []
