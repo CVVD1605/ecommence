@@ -1,34 +1,44 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Product Feedback{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h1 class="mb-4">Feedback for {{ product.title }}</h1>
+    <h1 class="mb-4 text-primary fw-bold">💬 Feedback for {{ product.title }}</h1>
 
     {% if feedbacks %}
-    <table class="table table-bordered table-striped">
-        <thead class="table-dark">
-            <tr>
-                <th>Customer</th>
-                <th>Comments</th>
-                <th>Sentiment</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for feedback in feedbacks %}
-            <tr>
-                <td>{{ feedback.customer.user.username }}</td>
-                <td>{{ feedback.comments }}</td>
-                <td>{{ feedback.sentiment|default:"Neutral" }}</td>
-                <td>{{ feedback.created_at|date:"M d, Y H:i" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="list-group">
+        {% for feedback in feedbacks %}
+        <div class="list-group-item p-3 border rounded shadow-sm mb-3">
+            <div class="d-flex align-items-start">
+                <!-- ✅ Customer Avatar (Placeholder) -->
+                <img src="{% static 'images/user-placeholder.png' %}" alt="User Avatar" 
+                     class="rounded-circle me-3" width="50" height="50">
+
+                <div class="w-100">
+                    <h5 class="mb-1 fw-bold text-dark">{{ feedback.customer.user.username }}</h5>
+
+                    <!-- ✅ Feedback Comment -->
+                    <p class="mb-1 text-muted">{{ feedback.comments }}</p>
+
+                    <!-- ✅ Sentiment Badge -->
+                    <span class="badge 
+                        {% if feedback.sentiment == 'Positive' %} bg-success 
+                        {% elif feedback.sentiment == 'Negative' %} bg-danger 
+                        {% else %} bg-secondary {% endif %}">
+                        {{ feedback.sentiment|default:"Neutral" }}
+                    </span>
+
+                    <!-- ✅ Date Posted -->
+                    <small class="d-block text-muted">Posted on {{ feedback.created_at|date:"M d, Y H:i" }}</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
     {% else %}
-        <p class="alert alert-info">No feedback available for this product.</p>
+        <p class="alert alert-info text-center">ℹ️ No feedback available for this product.</p>
     {% endif %}
 </div>
 {% endblock %}
