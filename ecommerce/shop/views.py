@@ -33,7 +33,6 @@ description_generator = pipeline('text-generation', model='gpt2')
 
 # ----------------- 🔹 USER AUTHENTICATION VIEWS 🔹 -----------------
 
-
 def is_superuser(user):
     return user.is_authenticated and user.is_superuser
 
@@ -47,7 +46,6 @@ def list_customers(request):
 
     customers = Customer.objects.all()
     return render(request, "customers/customer_list.html", {"customers": customers})
-
 
 def register(request):
     """Handles new user registration."""
@@ -70,12 +68,10 @@ def register(request):
 
     return render(request, 'register.html', {'form': form})
 
-
 @login_required
 def profile(request):
     """Displays user profile details."""
     return render(request, 'profile.html', {'user': request.user})
-
 
 def user_login(request):
     if request.method == "POST":
@@ -89,7 +85,6 @@ def user_login(request):
         messages.error(request, "Invalid username or password.")
     return render(request, 'login.html')
 
-
 def user_logout(request):
     logout(request)
     messages.success(request, "You have been logged out.")
@@ -97,12 +92,10 @@ def user_logout(request):
 
 # ----------------- 🔹 HOME PAGE VIEW 🔹 -----------------
 
-
 def home(request):
     return render(request, 'home.html', {'page_title': 'Home Page'})
 
 # ----------------- 🔹 CRUD OPERATIONS 🔹 -----------------
-
 
 @login_required
 def create_customer(request):
@@ -311,12 +304,14 @@ def update_product(request, product_id):
 
 
 @login_required
-def delete_product(request, pk):
+def delete_product(request, product_id):
     """Deletes a product."""
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(Product, id=product_id)
     if request.method == "POST":  # Confirm deletion via POST request
         product.delete()
+        messages.success(request, "✅ Product deleted successfully!")
         return redirect('product_list')  # Redirect after deletion
+        
     return render(request, 'product_confirm_delete.html', {'product': product})
 
 
@@ -595,7 +590,7 @@ def submit_feedback(request, product_id):
 
             else:
                 print("❌ Invalid feedback form:", form.errors)
-                return JsonResponse({"error": "❌ Invalid form submission.", "errors": form.errors}, status=400)
+                return JsonResponse({"error": "❌ You have submitted feedback for this product.", "errors": form.errors}, status=400)
 
         except json.JSONDecodeError:
             return JsonResponse({"error": "❌ Invalid JSON format."}, status=400)
